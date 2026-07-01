@@ -44,6 +44,4 @@ jobs:
           gh issue create \
             --repo "$REPO" \
             --title "codex 启动" \
-            --body "codex 启动
-
-Date: $today"
+            --body "codex 启动 - $today"
