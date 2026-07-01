@@ -2,8 +2,8 @@ name: Codex Start Reminder
 
 on:
   schedule:
-    # GitHub Actions schedules use UTC. 23:30 UTC is 07:30 in Asia/Shanghai.
-    - cron: "30 23 * * *"
+    # Run often in UTC, then gate in the job using Asia/Shanghai time.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,12 +13,37 @@ jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
-      - name: Create reminder issue
+      - name: Create reminder issue once per day after 07:30 Asia/Shanghai
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
+          today="$(TZ=Asia/Shanghai date +%F)"
+          hour="$(TZ=Asia/Shanghai date +%H)"
+          minute="$(TZ=Asia/Shanghai date +%M)"
+
+          if [ "$hour$minute" -lt 0730 ]; then
+            echo "Before 07:30 Asia/Shanghai; skipping."
+            exit 0
+          fi
+
+          existing="$(
+            gh issue list \
+              --repo "$REPO" \
+              --state all \
+              --search "\"codex 启动\" in:title created:$today" \
+              --json number \
+              --jq length
+          )"
+
+          if [ "$existing" -gt 0 ]; then
+            echo "Reminder already exists for $today; skipping."
+            exit 0
+          fi
+
           gh issue create \
             --repo "$REPO" \
             --title "codex 启动" \
-            --body "codex 启动"
+            --body "codex 启动
+
+Date: $today"
