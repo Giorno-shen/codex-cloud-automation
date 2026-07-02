@@ -1,8 +1,9 @@
-name: Codex Start Reminder
+name: Codex Cloud Start
 
 on:
   schedule:
-    # Run often in UTC, then gate in the job using Asia/Shanghai time.
+    # GitHub Actions schedules are best-effort. Check every 5 minutes, then
+    # create one Codex task per day after 07:30 Asia/Shanghai.
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
@@ -10,10 +11,10 @@ permissions:
   issues: write
 
 jobs:
-  remind:
+  start-codex:
     runs-on: ubuntu-latest
     steps:
-      - name: Create reminder issue once per day after 07:30 Asia/Shanghai
+      - name: Create one Codex cloud task after 07:30 Asia/Shanghai
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -31,18 +32,18 @@ jobs:
             gh issue list \
               --repo "$REPO" \
               --state all \
-              --search "\"codex 启动\" in:title created:$today" \
+              --search "\"codex-cloud-start\" in:title created:$today" \
               --json number \
               --jq length
           )"
 
           if [ "$existing" -gt 0 ]; then
-            echo "Reminder already exists for $today; skipping."
+            echo "Codex start issue already exists for $today; skipping."
             exit 0
           fi
 
           gh issue create \
             --repo "$REPO" \
-            --title "codex 启动" \
+            --title "codex-cloud-start $today" \
             --assignee "Giorno-shen" \
-            --body "@Giorno-shen codex 启动 - $today"
+            --body "@codex Please start a minimal cloud task for this repository. Do not modify files, do not open a pull request, and reply with a short acknowledgement only. Scheduled date: $today."
