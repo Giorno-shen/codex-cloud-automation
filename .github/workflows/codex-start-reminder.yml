@@ -3,18 +3,21 @@ name: Codex Cloud Start
 on:
   schedule:
     # GitHub Actions schedules are best-effort. Check every 5 minutes, then
-    # create one Codex task per day after 07:30 Asia/Shanghai.
+    # create one Codex PR task per day after 07:30 Asia/Shanghai.
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
-  issues: write
+  contents: write
+  pull-requests: write
 
 jobs:
   start-codex:
     runs-on: ubuntu-latest
     steps:
-      - name: Create one Codex cloud task after 07:30 Asia/Shanghai
+      - uses: actions/checkout@v4
+
+      - name: Create one Codex cloud PR task after 07:30 Asia/Shanghai
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -29,7 +32,7 @@ jobs:
           fi
 
           existing="$(
-            gh issue list \
+            gh pr list \
               --repo "$REPO" \
               --state all \
               --search "\"codex-cloud-start\" in:title created:$today" \
@@ -38,12 +41,30 @@ jobs:
           )"
 
           if [ "$existing" -gt 0 ]; then
-            echo "Codex start issue already exists for $today; skipping."
+            echo "Codex start PR already exists for $today; skipping."
             exit 0
           fi
 
-          gh issue create \
+          branch="codex-cloud-start-$today"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+
+          mkdir -p .github
+          echo "$today" > .github/codex-cloud-start.txt
+          git add .github/codex-cloud-start.txt
+          git commit -m "Codex cloud start $today"
+          git push --set-upstream origin "$branch"
+
+          pr_url="$(
+            gh pr create \
+              --repo "$REPO" \
+              --title "codex-cloud-start $today" \
+              --body "Daily Codex Cloud start trigger for $today." \
+              --base main \
+              --head "$branch"
+          )"
+
+          gh pr comment "$pr_url" \
             --repo "$REPO" \
-            --title "codex-cloud-start $today" \
-            --assignee "Giorno-shen" \
-            --body "@codex Please start a minimal cloud task for this repository. Do not modify files, do not open a pull request, and reply with a short acknowledgement only. Scheduled date: $today."
+            --body "@codex Please start a minimal cloud task for this pull request. Do not make code changes, do not push commits, and reply with a short acknowledgement only. Scheduled date: $today."
