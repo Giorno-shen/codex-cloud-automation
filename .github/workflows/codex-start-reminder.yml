@@ -19,7 +19,7 @@ jobs:
 
       - name: Create one Codex cloud PR task after 07:30 Asia/Shanghai
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_USER_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           today="$(TZ=Asia/Shanghai date +%F)"
@@ -31,17 +31,34 @@ jobs:
             exit 0
           fi
 
-          existing="$(
+          existing_pr="$(
             gh pr list \
               --repo "$REPO" \
               --state all \
               --search "\"codex-cloud-start\" in:title created:$today" \
               --json number \
-              --jq length
+              --jq '.[0].number // ""'
           )"
 
-          if [ "$existing" -gt 0 ]; then
-            echo "Codex start PR already exists for $today; skipping."
+          comment_body="@codex Please start a minimal cloud task for this pull request. Do not make code changes, do not push commits, and reply with a short acknowledgement only. Scheduled date: $today."
+
+          if [ -n "$existing_pr" ]; then
+            existing_comment_count="$(
+              gh pr view "$existing_pr" \
+                --repo "$REPO" \
+                --comments \
+                --json comments \
+                --jq '[.comments[] | select(.author.login == "Giorno-shen" and (.body | contains("@codex")))] | length'
+            )"
+
+            if [ "$existing_comment_count" -gt 0 ]; then
+              echo "Giorno-shen already requested Codex for $today; skipping."
+              exit 0
+            fi
+
+            gh pr comment "$existing_pr" \
+              --repo "$REPO" \
+              --body "$comment_body"
             exit 0
           fi
 
@@ -67,4 +84,4 @@ jobs:
 
           gh pr comment "$pr_url" \
             --repo "$REPO" \
-            --body "@codex Please start a minimal cloud task for this pull request. Do not make code changes, do not push commits, and reply with a short acknowledgement only. Scheduled date: $today."
+            --body "$comment_body"
